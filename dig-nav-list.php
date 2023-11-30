@@ -1,6 +1,8 @@
 <?php
-
-    // Replace these with your actual Airtable API key, base ID, and table ID
+#By Zachary Spalding @Southeastern New York Library Resources Council
+#https://airtable.com/<YOUR BASE ID>/api/docs
+#https://codepen.io/airtable/full/MeXqOg
+#Mkae sure to put in your API key from Airtable along with your CSS for the DIV tags and table and base ID
     $api_key = '<ADD YOUR API KEY>';
     $base_id = '<YOUR BASE ID>';
     $table_id = '<YOUR TABLE ID>';
@@ -32,14 +34,11 @@
         echo "Failed to parse JSON response from Airtable API.";
     } else {
 
-
+        //initialize variables
         $previousCounty = null;
         $previousOrg = null;
         $countycount = 0;
         $orgcount = 0;
-
-
-        //nov9
         $rowopen = 0;
         $cellopen = 0;
         $count = 0;
