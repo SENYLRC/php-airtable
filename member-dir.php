@@ -5,8 +5,8 @@
 #Mkae sure to put in your API key from Airtable along with your CSS for the DIV tags
 // Airtable API key and URL
 $apiKey = '<your api key>';
-$baseId = 'appF5045dT9RSe7HP';
-$tableId = 'tblG83rJka4zBkLla';
+$baseId = '<Your BASE ID>';
+$tableId = '<YOUR TABLE ID>';
 $apiUrl = "https://api.airtable.com/v0/{$baseId}/{$tableId}";
 
 // Set up cURL options
