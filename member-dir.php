@@ -2,7 +2,7 @@
 #By Zachary Spalding @Southeastern New York Library Resources Council
 #https://airtable.com/appF5045dT9RSe7HP/api/docs
 #https://codepen.io/airtable/full/MeXqOg
-#Mkae sure to put in your API key from Airtable
+#Mkae sure to put in your API key from Airtable along with your CSS for the DIV tags
 // Airtable API key and URL
 $apiKey = '<your api key>';
 $baseId = 'appF5045dT9RSe7HP';
