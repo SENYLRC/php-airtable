@@ -9,129 +9,146 @@ $baseId = '<YOUR BASE ID>';
 $tableId = '<YOUR TABLE ID>';
 $apiUrl = "https://api.airtable.com/v0/{$baseId}/{$tableId}";
 
-// Set up cURL options
-function fetchData($url, $apiKey, $params = [])
-{
+// --- Helpers ---
+function fetchData($url, $apiKey, $params = []) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url . '?' . http_build_query($params));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $apiKey,
-    ]);
-
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $apiKey]);
     $response = curl_exec($ch);
-
-    if (curl_errno($ch)) {
-        echo 'Error: ' . curl_error($ch);
-        die();
-    }
-
+    if (curl_errno($ch)) { echo 'Error: ' . curl_error($ch); exit; }
     curl_close($ch);
-
     return json_decode($response, true);
 }
 
-// Initial request without offset
+// Normalize field that may be scalar or array (take first if array)
+function field_first($fields, $name) {
+    if (!isset($fields[$name])) return '';
+    $v = $fields[$name];
+    if (is_array($v)) return isset($v[0]) ? trim((string)$v[0]) : '';
+    return trim((string)$v);
+}
+
 $params = [
-    'fields' => ['Organization (from Library or Nonprofit)', 'URL (from SENY Orgs)', 'Street (from SENY Orgs)', 'City (from SENY Orgs)', 'State (from SENY Orgs)', 'Zip Code (from SENY Orgs)', 'County (from SENY Orgs)', 'Phone Number', 'First Name', 'Last Name'], // Update with the correct field names
-    'filterByFormula' => '',
-    'filterByFormula' => 'OR(FIND("Active", {Status}), FIND("Contract", {Status}))',
-    'sort' => [
-        ['field' => 'County (from SENY Orgs)', 'direction' => 'asc'],
-        ['field' => 'Organization (from Library or Nonprofit)', 'direction' => 'asc'],
+    'fields' => [
+        'Organization','URL','Street','City','State','Zip Code','County',
+        'Phone Number','First Name','Last Name','Status'
     ],
-    'pageSize' => 100, // Maximum page size
+    // ✅ Your updated filter
+    'filterByFormula' => 'OR(FIND("Active", {Status}), FIND("Cohort ONE", {Status}), FIND("Cohort ONE Audit", {Status}))',
+    'pageSize' => 100,
+    // (Don’t rely on API sort; we’ll sort locally.)
 ];
 
-$previousCounty = null;
-$previousOrg = null;
-$countycount = 0;
-$orgcount = 0;
-$rowopen = 0;
-$cellopen = 0;
-$count = 0;
-
-echo "<div class='SenyMemberDirTable'>";
-
-// Loop through records and print information
+// Fetch all pages
+$all = [];
 do {
     $data = fetchData($apiUrl, $apiKey, $params);
-    //for testing
-    //print_r($data);
-
     if (isset($data['records'])) {
-        foreach ($data['records'] as $record) {
-            $organization = $record['fields']['Organization (from Library or Nonprofit)'];
-            $county = $record['fields']['County (from SENY Orgs)'];
-            $url = $record['fields']['URL (from SENY Orgs)'];
-            $street = $record['fields']['Street (from SENY Orgs)'];
-            $city = $record['fields']['City (from SENY Orgs)'];
-            $state = $record['fields']['State (from SENY Orgs)'];
-            $zip = $record['fields']['Zip Code (from SENY Orgs)'];
-            $phone = $record['fields']['Phone Number'];
-            $first =  $record['fields']['First Name'];
-            $last =  $record['fields']['Last Name'];
-
-            //check if new county
-            if ($county[0] != $previousCounty) {
-
-                //is previous cell and row open
-                if ($cellopen == 1) {
-
-                    echo "</div></div>"; //close cell and row
-                    $cellopen = 0;
-                    $rowopen = 0;
-                    $count = 0;
-                }
-
-                echo "<div class='SenyMemberDirTableRow'>";
-                echo "<hr>";
-
-                echo "<div class='HVconnCountyTableCell'>";
-                echo "<h2>" . $county[0] . " County</h2>";
-                echo "</div>";  //end county cell
-                $previousCounty = $county[0];
-                echo "<br><hr>";
+        foreach ($data['records'] as $r) {
+            $f = $r['fields'];
+            $row = [
+                'county' => field_first($f, 'County'),
+                'org'    => field_first($f, 'Organization'),
+                'url'    => field_first($f, 'URL'),
+                'street' => field_first($f, 'Street'),
+                'city'   => field_first($f, 'City'),
+                'state'  => field_first($f, 'State'),
+                'zip'    => field_first($f, 'Zip Code'),
+                'phone'  => field_first($f, 'Phone Number'),
+                'first'  => field_first($f, 'First Name'),
+                'last'   => field_first($f, 'Last Name'),
+            ];
+            if ($row['county'] !== '' && $row['org'] !== '') {
+                $all[] = $row;
             }
-
-
-            if ($organization != $previousOrg) {
-                //new library should be closing last cell
-                if ($cellopen == 1) {
-                    echo "</div>";
-                    $cellopen = 0;
-                }
-                if ($count++ % 2 == 0) {
-                    echo "</div>"; #end the SenyMemberDirTableRow  
-                    $rowopen = 0;
-                }
-                if ($rowopen == 0) {
-                    echo "<div class='SenyMemberDirTableRow'>";
-                    $rowopen = 1;
-                }
-                if ($cellopen == 0) {
-                    echo "<div class='SenyMemberDirTableCell'>";
-                    $cellopen = 1; //opening the cell
-                }
-
-                echo "<h2><a href='" . $url[0] . "'>" . $organization[0] . "</a> </h2>";
-                echo "<h3>" . $street[0] . ", " . $city[0] . ", " . $state[0] . ", " . $zip[0] . "</h3>";
-                echo "<h3>Digital Navigator(s):</h3>";
-                echo "<br>";
-                $previousOrg = $organization;
-            }
-            //list people
-            echo "<div style='font-size:22px'>";
-            echo "<p>{$first} {$last} $phone</p>";
-            echo "</div>"; //end font style
-            echo "<br>";
-        } //end foreach loop
+        }
     }
-
-    // Set the offset for the next request
     $params['offset'] = $data['offset'] ?? null;
 } while (isset($data['offset']));
 
-if (!isset($data['records'])) {
-    echo 'No records found.';
+if (empty($all)) { echo 'No records found.'; exit; }
+
+// Group by County → Organization, aggregate people
+$byCountyOrg = [];
+foreach ($all as $row) {
+    $county = $row['county'];
+    $org    = $row['org'];
+
+    if (!isset($byCountyOrg[$county])) $byCountyOrg[$county] = [];
+    if (!isset($byCountyOrg[$county][$org])) {
+        $byCountyOrg[$county][$org] = [
+            'org'    => $org,
+            'url'    => $row['url'],
+            'street' => $row['street'],
+            'city'   => $row['city'],
+            'state'  => $row['state'],
+            'zip'    => $row['zip'],
+            'people' => [],
+        ];
+    }
+    $byCountyOrg[$county][$org]['people'][] = [
+        'first' => $row['first'],
+        'last'  => $row['last'],
+        'phone' => $row['phone'],
+    ];
 }
+
+// Sort counties and orgs alphabetically (natural, case-insensitive)
+uksort($byCountyOrg, fn($a, $b) => strnatcasecmp($a, $b));
+foreach ($byCountyOrg as $county => &$orgs) {
+    uksort($orgs, fn($a, $b) => strnatcasecmp($a, $b));
+}
+unset($orgs);
+
+// --- Render ---
+echo "<div class='SenyMemberDirTable'>";
+
+foreach ($byCountyOrg as $countyName => $orgs) {
+    // County header row
+    echo "<div class='SenyMemberDirTableRow'>";
+    echo "<hr>";
+    echo "<div class='HVconnCountyTableCell'><h2>" . htmlspecialchars($countyName) . " County</h2></div>";
+    echo "<br><hr>";
+    echo "</div>";
+
+    // Two-up grid for orgs
+    $i = 0;
+    $rowOpen = false;
+    foreach ($orgs as $orgName => $info) {
+        if ($i % 2 === 0) {
+            if ($rowOpen) echo "</div>"; // close previous org row
+            echo "<div class='SenyMemberDirTableRow'>";
+            $rowOpen = true;
+        }
+
+        echo "<div class='SenyMemberDirTableCell'>";
+        $orgText = htmlspecialchars($orgName);
+        $orgLink = $info['url'] ? "<a href='" . htmlspecialchars($info['url']) . "'>{$orgText}</a>" : $orgText;
+        echo "<h2>{$orgLink}</h2>";
+
+        $addressParts = array_filter([
+            $info['street'],
+            $info['city'],
+            $info['state'],
+            $info['zip']
+        ], fn($v) => $v !== '');
+        if (!empty($addressParts)) {
+            echo "<h3>" . htmlspecialchars(implode(', ', $addressParts)) . "</h3>";
+        }
+
+        echo "<h3>Digital Navigator(s):</h3><br>";
+        echo "<div style='font-size:22px'>";
+        foreach ($info['people'] as $p) {
+            $name = trim($p['first'] . ' ' . $p['last']);
+            echo "<p>" . htmlspecialchars($name) . ( $p['phone'] ? " " . htmlspecialchars($p['phone']) : "" ) . "</p>";
+        }
+        echo "</div><br>";
+
+        echo "</div>"; // cell
+        $i++;
+    }
+    if ($rowOpen) echo "</div>"; // close last open org row in this county
+}
+
+echo "</div>"; // SenyMemberDirTable
